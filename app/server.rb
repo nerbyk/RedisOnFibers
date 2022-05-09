@@ -1,28 +1,28 @@
-require "socket"
+require 'socket'
 
 class YourRedisServer
   def initialize(port)
-    @port = port
+    @server = TCPServer.new(port)
+    puts "Listening on port #{port}"
   end
 
   def start
-    server = TCPServer.new(@port)
-
     loop do
-      client = server.accept
-      client_msg = client.gets
+      connection = @server.accept 
+      handle(connection)
+      puts("CLOSED")
+    end
+  end
 
-      puts(client_msg)
+  private
 
-      # case client_msg
-      # when /\+PING/ 
-        client.puts("+PONG")
-      # else 
-      #   client.puts("+(error) unknown command '#{client_msg}'")
-      # end
+  def handle(connection)
+    until connection.eof?
+      request = connection.gets
 
-      client.close
-    end 
+      connection.close if request.nil?
+      connection.puts('+PONG') unless connection.closed?
+    end
   end
 end
 
