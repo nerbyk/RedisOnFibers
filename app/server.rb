@@ -10,8 +10,8 @@ class YourRedisServer
     puts("Logs from your program will appear here!")
 
     # Uncomment this block to pass the first stage
-    # server = TCPServer.new(@port)
-    # client = server.accept
+    server = TCPServer.new(@port)
+    client = server.accept
   end
 end
 
