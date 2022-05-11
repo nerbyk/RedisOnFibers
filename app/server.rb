@@ -1,9 +1,14 @@
+# frozen_string_literal: true
+
 require 'socket'
+
+# require './helpers/resp_decoder'
 
 class YourRedisServer
   def initialize(port)
     @server = TCPServer.new(port)
     @clients = []
+
     puts "Listening on port #{port}"
   end
 
@@ -18,13 +23,13 @@ class YourRedisServer
     loop do
       sleep(0.1) if @clients.empty?
 
-      @clients.each_with_index do |client|
-        client_command = client.read_nonblock(256, exception: false)
+      @clients.each do |client|
+        client_message = client.read_nonblock(256, exception: false)
 
         @clients.delete(client) if client.closed?
-        next if client_command == :wait_readable || client_command.nil?
+        next if client_message == :wait_readable || client_message.nil?
 
-        response = handle_client_command(client_command)
+        response = handle_client_command(client_message)
         client.puts response
       end
     end
@@ -32,8 +37,8 @@ class YourRedisServer
 
   private
 
-  def handle_client_command(_command)
-    "+PONG"
+  def handle_client_command(_message)
+    '+PONG'
   end
 end
 
