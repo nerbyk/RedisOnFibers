@@ -1,9 +1,7 @@
 # frozen_string_literal: true
 
 require 'socket'
-
-# require './helpers/resp_decoder'
-
+require_relative './helpers/resp'
 class YourRedisServer
   def initialize(port)
     @server = TCPServer.new(port)
@@ -37,8 +35,8 @@ class YourRedisServer
 
   private
 
-  def handle_client_command(_message)
-    '+PONG'
+  def handle_client_command(message)
+    RESP.parse(message)
   end
 end
 

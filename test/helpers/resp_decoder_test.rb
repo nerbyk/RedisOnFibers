@@ -1,34 +1,64 @@
 # frozen_string_literal: true
 
 require 'test_helper'
-require './app/helpers/resp_decoder'
+require './app/helpers/resp'
 
-describe RespDecoder do
-  let(:described_class) { RespDecoder }
+describe RESP do
+  let(:described_module) { RESP }
 
-  describe '#decode' do
+  describe '#parse' do
     it 'returns a simple string' do
-      assert_equal 'OK', described_class.decode('+OK')
+      assert_equal 'OK', described_module.parse('+OK')
     end
 
-    it 'decode a simple integer' do
-      assert_equal 1, described_class.decode(':1')
+    it 'returns a simple integer' do
+      assert_equal 1, described_module.parse(':1')
     end
 
-    it 'decode a simple bulk string' do
-      assert_equal 'OK', described_class.decode("$2\r\nOK")
+    it 'returns a simple bulk string' do
+      assert_equal 'OK', described_module.parse("$2\r\nOK")
     end
 
-    it 'decodes null bulk string' do
-      assert_equal nil, described_class.decode("$-1\r\n")
+    it 'returns null bulk string' do
+      assert_nil described_module.parse("$-1\r\n")
     end
 
-    it 'decode a simple array' do
-      assert_equal ['OK'], described_class.decode("*1\r\n+OK")
+    it 'returns a simple array' do
+      assert_equal ['OK'], described_module.parse("*1\r\n+OK")
     end
 
-    it 'decodes a nested array with diffrent types' do
-      assert_equal ['foo', 3, 'bar'], described_class.decode("*3\r\n+foo\r\n:1337\r\n+bar")
+    it 'returns a nested array with diffrent types' do
+      assert_equal ['foo', 1337, 'bar'], described_module.parse("*3\r\n+foo\r\n:1337\r\n+bar")
+    end
+
+    it 'returns a nested array with null bulk string' do
+      assert_equal [nil], described_module.parse("*1\r\n$-1\r\n")
+    end
+  end
+
+  describe '#generate' do
+    it 'generates a simple string' do
+      assert_equal "+OK\r\n", described_module.generate('OK')
+    end
+
+    it 'generates a simple integer' do
+      assert_equal ":1\r\n", described_module.generate(1)
+    end
+
+    it 'generates a simple bulk string' do
+      assert_equal "$2\r\nOK\r\n", described_module.generate('OK', with_bytesize: true)
+    end
+
+    it 'generates a simple array' do
+      assert_equal "*1\r\n+OK\r\n", described_module.generate(['OK'])
+    end
+
+    it 'generates a nested array with diffrent types' do
+      assert_equal "*3\r\n+foo\r\n:1337\r\n+bar\r\n", described_module.generate(['foo', 1337, 'bar'])
+    end
+
+    it 'generates a nested array with null bulk string' do
+      assert_equal "*1\r\n$-1\r\n", described_module.generate([nil])
     end
   end
 end
