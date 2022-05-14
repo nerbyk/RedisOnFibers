@@ -45,13 +45,13 @@ module RESP
     end
 
     NullBulkStringInstance = Object.new.tap do |obj|
-      NULL_BULK_STRING = '$-1'.freeze
+      NULL_BULK_STRING = "$-1\r\n".freeze
       def obj.parse
         nil
       end
 
       def obj.generate
-        "#{NULL_BULK_STRING}\r\n"
+        NULL_BULK_STRING
       end
     end
 
@@ -63,12 +63,14 @@ module RESP
       def parse
         raise InvalidRESPType, 'Ivalid type size' if underlying_array.size != elements_count
 
-        underlying_array.map { |el| RESP.parse(el) }
+        underlying_array.map { |el|
+          RESP.parse(el)
+        }
       end
     end
 
     NullArrayInstance = Object.new.tap do |obj|
-      NULL_ARRAY_STRING = '*-1'.freeze
+      NULL_ARRAY_STRING = "*-1\r\n".freeze
       def obj.parse
         [nil]
       end

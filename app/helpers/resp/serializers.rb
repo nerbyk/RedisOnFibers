@@ -11,7 +11,7 @@ module RESP
     ArraySerializer = -> (resp_string) {
       (resp_type_size, resp_string) = sized_resp(resp_string)
 
-      [resp_string.split("\r\n"), resp_type_size]
+      [resp_string.scan(/[^\r\n]*\r\n/), resp_type_size]
     }
 
     BulkStringSerializer = -> (resp_string) {
@@ -26,7 +26,7 @@ module RESP
     def sized_resp(resp_string)
       partitioned = resp_string.partition(/(\r\n|\r|\n)+/)
 
-      [partitioned[0][1..].to_i, partitioned[-1].chomp]
+      [partitioned[0][1..].to_i, partitioned[-1]]
     end
   end
 end

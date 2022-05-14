@@ -8,15 +8,15 @@ describe RESP do
 
   describe '#parse' do
     it 'returns a simple string' do
-      assert_equal 'OK', described_module.parse('+OK')
+      assert_equal 'OK', described_module.parse("+OK\r\n")
     end
 
     it 'returns a simple integer' do
-      assert_equal 1, described_module.parse(':1')
+      assert_equal 1, described_module.parse(":1\r\n")
     end
 
     it 'returns a simple bulk string' do
-      assert_equal 'OK', described_module.parse("$2\r\nOK")
+      assert_equal 'OK', described_module.parse("$2\r\nOK\r\n")
     end
 
     it 'returns null bulk string' do
@@ -24,11 +24,11 @@ describe RESP do
     end
 
     it 'returns a simple array' do
-      assert_equal ['OK'], described_module.parse("*1\r\n+OK")
+      assert_equal ['OK'], described_module.parse("*1\r\n+OK\r\n")
     end
 
     it 'returns a nested array with diffrent types' do
-      assert_equal ['foo', 1337, 'bar'], described_module.parse("*3\r\n+foo\r\n:1337\r\n+bar")
+      assert_equal ['foo', 1337, 'bar'], described_module.parse("*3\r\n+foo\r\n:1337\r\n+bar\r\n")
     end
 
     it 'returns a nested array with null bulk string' do
