@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 require 'test_helper'
 require './app/helpers/resp'
 
@@ -27,12 +25,12 @@ describe RESP do
       assert_equal ['OK'], described_module.parse("*1\r\n+OK\r\n")
     end
 
-    it 'returns a nested array with diffrent types' do
-      assert_equal ['foo', 1337, 'bar'], described_module.parse("*3\r\n+foo\r\n:1337\r\n+bar\r\n")
-    end
-
     it 'returns a nested array with null bulk string' do
       assert_equal [nil], described_module.parse("*1\r\n$-1\r\n")
+    end
+
+    it 'return a nested array for redis ECHO with bulk types' do
+      assert_equal ['ECHO', 'simple', 'foobar'], described_module.parse("*3\r\n$4\r\nECHO\r\n+simple\r\n$6\r\nfoo\r\nbar\r\n")
     end
   end
 
