@@ -36,7 +36,14 @@ class YourRedisServer
   private
 
   def handle_client_command(message)
-    RESP.parse(message)
+    request_message = RESP.parse(message)
+
+    case request_message[0].downcase
+    when /echo/ 
+      RESP.generate(request_message[1])
+    else
+      RESP.generate('PONG')
+    end
   end
 end
 
