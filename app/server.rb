@@ -3,9 +3,14 @@
 require 'socket'
 require_relative './helpers/resp'
 class YourRedisServer
+  TimeEvent = Struct.new(:key, :process_at)
+
   def initialize(port)
-    @server = TCPServer.new(port)
-    @clients = []
+    @server  = TCPServer.new(port)
+
+    @clients     = []
+    @storage     = {}
+    @time_events = []
 
     puts "Listening on port #{port}"
   end
@@ -19,7 +24,7 @@ class YourRedisServer
     end
 
     loop do
-      sleep(0.1) if @clients.empty?
+      sleep(1) if @clients.empty?
 
       @clients.each do |client|
         client_message = client.read_nonblock(256, exception: false)
@@ -30,6 +35,8 @@ class YourRedisServer
         response = handle_client_command(client_message)
         client.puts response
       end
+
+      process_time_events
     end
   end
 
@@ -45,11 +52,25 @@ class YourRedisServer
     when /get/
       RESP.generate(@storage[request_message[0]] || nil)
     when /set/
-      @storage[request_message[0]] = request_message[1]
+      (key, value,option, option_value) = request_message
+
+      @storage[key] = value
+
+      add_time_event(key, Time.now.to_f.truncate + option_value) if option == /EX/ && option_value.to_i > 0
 
       RESP.generate('OK')
     else
       RESP.generate('PONG')
+    end
+  end
+
+  def add_time_event(key, process_at)
+    @time_events << TimeEvent.new(key, process_at)
+  end
+
+  def process_time_events
+    @time_events.delete_if do |time_event|
+      !!@storage.delete(time_event.key) if time_event.process_at <= Time.now.to_f
     end
   end
 end
