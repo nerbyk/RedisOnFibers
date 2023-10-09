@@ -1,5 +1,5 @@
 require 'test_helper'
-require './app/helpers/resp'
+require 'helpers/resp'
 
 describe RESP do
   let(:described_module) { RESP }

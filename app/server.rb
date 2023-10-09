@@ -2,17 +2,24 @@
 
 require 'socket'
 require_relative './helpers/resp'
-class YourRedisServer
+class Server
   TimeEvent = Struct.new(:key, :process_at)
 
-  def initialize(port)
-    @server  = TCPServer.new(port)
+  def initialize(host, port)
+    @server = TCPServer.new(host, port)
 
-    @clients     = []
-    @storage     = {}
+    @clients = []
+    @storage = {}
     @time_events = []
 
+    at_exit { stop }
+
     puts "Listening on port #{port}"
+  end
+
+  def stop
+    @server.close
+    @clients.each(&:close)
   end
 
   def start
@@ -52,7 +59,7 @@ class YourRedisServer
     when /get/
       RESP.generate(@storage[request_message[0]] || nil)
     when /set/
-      (key, value,option, option_value) = request_message
+      (key, value, option, option_value) = request_message
 
       @storage[key] = value
 
@@ -74,5 +81,3 @@ class YourRedisServer
     end
   end
 end
-
-YourRedisServer.new(6379).start
