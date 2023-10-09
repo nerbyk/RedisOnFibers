@@ -7,7 +7,7 @@ require:
   - standard
 
 AllCops:
-  TargetRubyVersion: 2.7.5
+  TargetRubyVersion: 3.2
   SuggestExtensions: false
 
 Style/StringLiterals:
@@ -31,3 +31,5 @@ Layout/SpaceInLambdaLiteral:
 Style/OptionalArguments:
   Enabled: false
 
+Layout/EmptyLineBetweenDefs:
+  AllowAdjacentOneLineDefs: true
