@@ -2,11 +2,9 @@ require_relative 'server'
 
 module Generate
   module_function def run
-    ::Server.new(*ARGV).tap do |server|
-      Process.kill('USR1', Process.ppid)
-
-      server.start
-    end
+    ::Server.new(*ARGV)
+      .tap { Process.kill('USR1', Process.ppid) }
+      .start
   end
 end
 

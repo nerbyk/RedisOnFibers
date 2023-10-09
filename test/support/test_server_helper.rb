@@ -1,52 +1,56 @@
 module TestServerHelper
-  # TODO: Handle minitest multy-process execution
-  def start_redis_server(host = '0.0.0.0', port = 6380)
-    @port = port.to_s
-    @host = host
-    @pid = spawn_server_process
+  ConnectionOptions = Data.define(:host, :port) do  
+    def initialize(port: '6380', host: '0.0.0.0') = super
+    def values = to_h.values
   end
 
-  def stop_redis_server
-    Process.kill('TERM', @pid)
-    Process.wait(@pid)
+  Connection = Data.define(:options) do
+    def initialize(options = ConnectionOptions.new) = super
+    def run = TCPSocket.open(*options.values) { yield(_1) }
   end
 
-  def send_command(command)
-    connection do |client|
-      client.puts parsed_command(command)
+  CommandRunner = lambda do |command, connection|
+    connection.run do |client|
+      client.puts RESP.generate(command.split(' '))
       client.gets.chomp
     end
   end
 
+  def start_redis_server()
+    @conn_opts = ConnectionOptions.new.freeze
+    @pid = spawn_server_process
+  end
+  
+  def stop_redis_server
+    Process.kill('TERM', @pid)
+    Process.wait(@pid)
+  end
+  
+  def send_command(command)
+    CommandRunner.call(command, Connection[@conn_opts])
+  end
+  
   def send_commmands(*commands)
     commands.map { send_command(_1) }
   end
-
+  
   def send_parallel_commands(*commands)
-    commands.map do |command|
-      Ractor.new(RESP, command, [@host, @port]) do |resp, c, (*opts)|
-        res = TCPSocket.open(*opts) do |conn|
-          conn.puts resp.generate(c.split(' '))
-          conn.gets.chomp
-        end
+    Ractor.make_shareable(CommandRunner)
 
-        Ractor.yield(res)
+    commands.map do |command|
+      Ractor.new(command, Connection[@conn_opts]) do |cmd, conn|
+        Ractor.yield(CommandRunner[cmd, conn])
       end
     end.map(&:take)
   end
-
-  private
-
-  def connection = TCPSocket.new(@host, @port).tap { return yield(_1) }.close
-  def parsed_command(c) = RESP.generate(c.split(' '))
-
-  def spawn_server_process
+  
+  private def spawn_server_process(opts = @conn_opts)
     server_ready = false
 
     Signal.trap('USR1') { server_ready = true }
 
     pid = fork do
-      exec 'ruby', "#{$SOURCE_PATH}/generate_test_server.rb", @host, @port
+      exec 'ruby', "#{$SOURCE_PATH}/generate_test_server.rb", opts.host, opts.port
     end
 
     sleep(0.1) until server_ready
