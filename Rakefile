@@ -11,6 +11,16 @@ namespace :test do
     t.test_files = FileList['test/**/*_test.rb']
     t.verbose = true
   end
+
+  desc 'Run specific test'
+  task :run, [:file] do |_task, args|
+    file, name = args.file.split(':')
+
+    test_command = "ruby -Ilib:test #{__dir__}/#{file}"
+    test_command += " --name /#{name}/" if name
+
+    system(test_command)
+  end
 end
 
 namespace :rubocop do
