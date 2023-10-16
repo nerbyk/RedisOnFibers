@@ -6,7 +6,7 @@ require_relative './request_handler'
 
 class Server
   Storage = Data.define(:data) do
-    TimeEvent = Struct.new(:key, :process_at)
+    TimeEvent = Data.define(:key, :process_at)
 
     def initialize(data: {})
       @data = data
@@ -53,7 +53,7 @@ class Server
 
         Fiber.schedule { serve_client(new_client) }
       rescue IO::WaitReadable, Errno::EINTR
-        @server.wait_readable
+        IO.select([@server])
         retry
       end
     end
