@@ -4,6 +4,8 @@ source 'https://rubygems.org'
 
 git_source(:github) { |repo_name| "https://github.com/#{repo_name}" }
 
+gem 'evt' # FiberScheduler interface
+
 group :test do
   gem 'minitest', '~> 5.8'
   gem 'minitest-rg', '~> 5.2'

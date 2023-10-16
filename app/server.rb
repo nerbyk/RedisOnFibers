@@ -1,16 +1,37 @@
 # frozen_string_literal: true
 
 require 'socket'
-require_relative './helpers/resp'
+require 'evt'
+require_relative './request_handler'
+
 class Server
-  TimeEvent = Struct.new(:key, :process_at)
+  Storage = Data.define(:data) do
+    TimeEvent = Struct.new(:key, :process_at)
 
-  def initialize(host, port)
+    def initialize(data: {})
+      @data = data
+      @time_events = []
+      @mutex = Mutex.new
+    end
+
+    def [](key)
+      @mutex.synchronize { @data[key] }
+    end
+
+    def []=(key, value)
+      @mutex.synchronize { @data[key] = value }
+    end
+
+    def add_time_event(key, process_at)
+      @mutex.synchronize { @time_events << TimeEvent.new(key, process_at) }
+    end
+  end
+
+  def initialize(host, port, handler: RequestHandler)
     @server = TCPServer.new(host, port)
-
     @clients = []
-    @storage = {}
-    @time_events = []
+    @handler = handler
+    @storage = Storage.new
 
     at_exit { stop }
 
@@ -23,61 +44,34 @@ class Server
   end
 
   def start
-    Thread.new do
+    Fiber.set_scheduler(Evt::Scheduler.new)
+
+    Fiber.schedule do
       loop do
-        new_client = @server.accept
+        new_client = @server.accept_nonblock
         @clients << new_client
+
+        Fiber.schedule { serve_client(new_client) }
+      rescue IO::WaitReadable, Errno::EINTR
+        @server.wait_readable
+        retry
       end
-    end
-
-    loop do
-      sleep(1) if @clients.empty?
-
-      @clients.each do |client|
-        client_message = client.read_nonblock(256, exception: false)
-
-        @clients.delete(client) if client.closed?
-        next if client_message == :wait_readable || client_message.nil?
-
-        response = handle_client_command(client_message)
-        client.puts response
-      end
-
-      process_time_events
     end
   end
 
   private
 
-  def handle_client_command(message)
-    request_message = RESP.parse(message)
-    command = request_message.shift.downcase
+  def serve_client(client)
+    loop do
+      client_message = client.read_nonblock(256, exception: false)
 
-    case command
-    when /echo/
-      RESP.generate(request_message[0])
-    when /get/
-      RESP.generate(@storage[request_message[0]] || nil)
-    when /set/
-      (key, value, option, option_value) = request_message
+      @clients.delete(client) if client.closed?
+      next if client_message == :wait_readable || client_message.nil?
 
-      @storage[key] = value
+      response = @handler.process(client_message, @storage)
+      client.puts response
 
-      add_time_event(key, Time.now.to_f.truncate + option_value) if option == /EX/ && option_value.to_i > 0
-
-      RESP.generate('OK')
-    else
-      RESP.generate('PONG')
-    end
-  end
-
-  def add_time_event(key, process_at)
-    @time_events << TimeEvent.new(key, process_at)
-  end
-
-  def process_time_events
-    @time_events.delete_if do |time_event|
-      !!@storage.delete(time_event.key) if time_event.process_at <= Time.now.to_f
+      Fiber.yield
     end
   end
 end

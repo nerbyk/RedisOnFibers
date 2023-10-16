@@ -5,6 +5,7 @@ GEM
     ast (2.4.2)
     builder (3.2.4)
     coderay (1.1.3)
+    evt (0.4.0)
     method_source (1.0.0)
     minitest (5.15.0)
     minitest-hooks (1.5.0)
@@ -53,6 +54,7 @@ PLATFORMS
   x86_64-darwin-22
 
 DEPENDENCIES
+  evt
   minitest (~> 5.8)
   minitest-hooks (~> 1.5)
   minitest-reporters (~> 1.1)
