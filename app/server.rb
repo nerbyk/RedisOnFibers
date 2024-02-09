@@ -34,19 +34,19 @@ class Server
     @storage = Storage.new
 
     RESPS = {
-      :ok => 'OK',
-      :pong => 'PONG',
-      :err => 'ERR',
-      :ex => 'EX'
+      ok: 'OK',
+      pong: 'PONG',
+      err: 'ERR',
+      ex: 'EX'
     }
-    
+
     def self.execute(query)
       COMMANDS_EXECUTORS[query.command].call(query)
     end
 
     def self.execute_set(query)
       key, value = query.args
-  
+
       @storage[key] = value
       @storage.add_time_event(key, options[1]) if query.options[0] == RESPS[:ex]
 
@@ -78,29 +78,28 @@ class Server
     }
   end
 
-
   Request = Data.define(:command, :args) do
     def self.[](request_string)
       command, *args = request_string.split
       command = command.downcase.to_sym
 
-      new(command: , args: )
+      new(command:, args:)
     end
   end
 
   Query = Struct.new(:command, :args, :options) do
-    QUERIES = {
-      set: ->(args) { { args: args[0..1], options: args[2..-1] } },
-      get: ->(args) { { args: [args[0]] } },
-      echo: ->(args) { { args: } },
-      ping: ->(_) { {} },
+    QUERIES = { # rubocop:disable Lint/ConstantDefinitionInBlock
+      set: -> (args) { { args: args[0..1], options: args[2..] } },
+      get: -> (args) { { args: [args[0]] } },
+      echo: -> (args) { { args: } },
+      ping: -> (_) { {} }
     }
 
     def self.[](request)
       if QUERIES.key?(request.command)
         new(command: request.command, **QUERIES[request.command][request.args])
       else
-        new(command: :error, args: ['ERR', 'Unknown command'] )
+        new(command: :error, args: ['ERR', 'Unknown command'])
       end
     end
   end
@@ -121,11 +120,11 @@ class Server
       log 'Listening on: ' + server.local_address.inspect
 
       loop do
-        conn, addr = server.accept
+        conn, _addr = server.accept
           .tap { |conn| log "Accepted connection from: #{conn.peeraddr.inspect}" }
 
         Fiber.schedule do
-          next unless req = conn.gets("\n")
+          next unless (req = conn.gets("\n"))
 
           req.tap { |received_msg| log "Received message: #{received_msg.inspect}" }
             .then { |raw_request| Request[raw_request] }
