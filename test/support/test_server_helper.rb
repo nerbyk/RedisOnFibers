@@ -1,24 +1,16 @@
+require 'client'
+
 module TestServerHelper
-  ConnectionOptions = Data.define(:host, :port) do  
-    def initialize(port: '6380', host: '0.0.0.0') = super
-    def values = to_h.values
-  end
-
-  Connection = Data.define(:options) do
-    def initialize(options = ConnectionOptions.new) = super
-    def run = TCPSocket.open(*options.values) { yield(_1) }
-  end
-
-  CommandRunner = lambda do |command, connection|
-    connection.run do |client|
-      client.puts RESP.generate(command.split(' '))
-      client.gets.chomp
+  CommandRunner = ->(command, client) do
+    client.connection do 
+      request(command)
+      return receive.chomp
     end
   end
 
-  def start_redis_server()
-    @conn_opts = ConnectionOptions.new.freeze
+  def start_redis_server
     @pid = spawn_server_process
+    @client = Client.new
   end
   
   def stop_redis_server
@@ -26,38 +18,55 @@ module TestServerHelper
     Process.wait(@pid)
   end
   
-  def send_command(command)
-    CommandRunner.call(command, Connection[@conn_opts])
+  def send_command(command, client: @client)
+    CommandRunner[command, client]
   end
   
   def send_commmands(*commands)
-    commands.map { send_command(_1) }
+    commands.map(&method(:send_command))
   end
   
   def send_parallel_commands(*commands)
+    Ractor.make_shareable(Client)
     Ractor.make_shareable(CommandRunner)
 
     commands.map do |command|
-      Ractor.new(command, Connection[@conn_opts]) do |cmd, conn|
-        Ractor.yield(CommandRunner[cmd, conn])
+      Ractor.new(command, Client.new) do |cmd, client|
+        Ractor.yield CommandRunner[cmd, client]
       end
     end.map(&:take)
   end
   
-  private def spawn_server_process(opts = @conn_opts)
-    server_ready = false
-
-    Signal.trap('USR1') { server_ready = true }
+  private def spawn_server_process
+    raise "Server already running" if server_running?
 
     pid = fork do
-      exec 'ruby', "#{$SOURCE_PATH}/generate_test_server.rb", opts.host, opts.port
+      exec "ruby", "#{$SOURCE_PATH}/server.rb"
     end
 
-    sleep(0.1) until server_ready
-
-    Process.detach(pid)
+    wait_for_tcp_socket
 
     pid
+  end
+
+  def wait_for_tcp_socket(timeout: 5)
+    start_time = Time.now
+    
+    while ((Time.now - start_time) < timeout)
+      return if server_running?
+
+      sleep 0.1
+      puts 'Waiting for server to start...'
+    end
+
+    raise "Server did not start in #{timeout} seconds"
+  end
+
+  def server_running?
+    TCPSocket.open(::Client::Connection::HOST, Client::Connection::PORT).close
+    true
+  rescue Errno::ECONNREFUSED
+    false
   end
 end
 
