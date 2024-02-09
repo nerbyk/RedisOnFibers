@@ -1,78 +1,150 @@
 # frozen_string_literal: true
 
 require 'socket'
-require_relative './helpers/resp'
-class YourRedisServer
-  TimeEvent = Struct.new(:key, :process_at)
+require 'logger'
+require 'delegate'
+require 'async/scheduler'
 
-  def initialize(port)
-    @server  = TCPServer.new(port)
+Fiber.set_scheduler(Async::Scheduler.new)
 
-    @clients     = []
-    @storage     = {}
-    @time_events = []
+class Server
+  class Storage < DelegateClass(Hash)
+    TimeEvent = Data.define(:key, :process_at)
 
-    puts "Listening on port #{port}"
+    def initialize(data: {})
+      @time_events = []
+      @mutex = Mutex.new
+      super(data)
+    end
+
+    def [](key)
+      @mutex.synchronize { super }
+    end
+
+    def []=(key, value)
+      @mutex.synchronize { super }
+    end
+
+    def add_time_event(key, process_at)
+      @mutex.synchronize { @time_events << TimeEvent.new(key, process_at) }
+    end
+  end
+
+  class QueryExecutor
+    @storage = Storage.new
+
+    RESPS = {
+      ok: 'OK',
+      pong: 'PONG',
+      err: 'ERR',
+      ex: 'EX'
+    }
+
+    def self.execute(query)
+      COMMANDS_EXECUTORS[query.command].call(query)
+    end
+
+    def self.execute_set(query)
+      key, value = query.args
+
+      @storage[key] = value
+      @storage.add_time_event(key, options[1]) if query.options[0] == RESPS[:ex]
+
+      RESPS[:ok]
+    end
+
+    def self.execute_get(query)
+      @storage[query.args.first]
+    end
+
+    def self.execute_echo(query)
+      query.args.join(' ')
+    end
+
+    def self.execute_ping(_query)
+      RESPS[:pong]
+    end
+
+    def self.execute_err(query)
+      query.args.join(' ')
+    end
+
+    COMMANDS_EXECUTORS = {
+      set: method(:execute_set),
+      get: method(:execute_get),
+      echo: method(:execute_echo),
+      ping: method(:execute_ping),
+      error: method(:execute_err)
+    }
+  end
+
+  Request = Data.define(:command, :args) do
+    def self.[](request_string)
+      command, *args = request_string.split
+      command = command.downcase.to_sym
+
+      new(command:, args:)
+    end
+  end
+
+  Query = Struct.new(:command, :args, :options) do
+    QUERIES = { # rubocop:disable Lint/ConstantDefinitionInBlock
+      set: -> (args) { { args: args[0..1], options: args[2..] } },
+      get: -> (args) { { args: [args[0]] } },
+      echo: -> (args) { { args: } },
+      ping: -> (_) { {} }
+    }
+
+    def self.[](request)
+      if QUERIES.key?(request.command)
+        new(command: request.command, **QUERIES[request.command][request.args])
+      else
+        new(command: :error, args: ['ERR', 'Unknown command'])
+      end
+    end
+  end
+
+  PORT = ENV.fetch('PORT', 3000).to_i
+  HOST = ENV.fetch('HOST', '127.0.0.1').freeze
+  TCP_BACKLOG = ENV.fetch('TCP_BACKLOG', '1024').to_i
+
+  def initialize
+    @logger = Logger.new($stdout)
   end
 
   def start
-    Thread.new do
+    Fiber.schedule do
+      server = TCPServer.new(HOST, PORT)
+      server.listen(TCP_BACKLOG)
+
+      log 'Listening on: ' + server.local_address.inspect
+
       loop do
-        new_client = @server.accept
-        @clients << new_client
+        conn, _addr = server.accept
+          .tap { |conn| log "Accepted connection from: #{conn.peeraddr.inspect}" }
+
+        Fiber.schedule do
+          next unless (req = conn.gets("\n"))
+
+          req.tap { |received_msg| log "Received message: #{received_msg.inspect}" }
+            .then { |raw_request| Request[raw_request] }
+            .then { |request| Query[request] }
+            .then { |query| QueryExecutor.execute(query) }
+            .then { |response| conn.puts(response) }
+        rescue => e
+          log "Error: #{e.full_message}", level: :error
+          conn&.close
+        end
+      rescue => e
+        log "Error accepting connection: #{e.message}", level: :error
+        conn&.close
       end
     end
-
-    loop do
-      sleep(1) if @clients.empty?
-
-      @clients.each do |client|
-        client_message = client.read_nonblock(256, exception: false)
-
-        @clients.delete(client) if client.closed?
-        next if client_message == :wait_readable || client_message.nil?
-
-        response = handle_client_command(client_message)
-        client.puts response
-      end
-
-      process_time_events
-    end
   end
 
-  private
-
-  def handle_client_command(message)
-    request_message = RESP.parse(message)
-    command = request_message.shift.downcase
-
-    case command
-    when /echo/
-      RESP.generate(request_message[0])
-    when /get/
-      RESP.generate(@storage[request_message[0]] || nil)
-    when /set/
-      (key, value,option, option_value) = request_message
-
-      @storage[key] = value
-
-      add_time_event(key, Time.now.to_f.truncate + option_value) if option == /EX/ && option_value.to_i > 0
-
-      RESP.generate('OK')
-    else
-      RESP.generate('PONG')
-    end
-  end
-
-  def add_time_event(key, process_at)
-    @time_events << TimeEvent.new(key, process_at)
-  end
-
-  def process_time_events
-    @time_events.delete_if do |time_event|
-      !!@storage.delete(time_event.key) if time_event.process_at <= Time.now.to_f
-    end
+  private def log(msg, level: :info)
+    @logger.public_send(level, msg)
   end
 end
 
-YourRedisServer.new(6379).start
+Server.new.start if $PROGRAM_NAME == __FILE__

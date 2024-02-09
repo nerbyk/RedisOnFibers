@@ -1,9 +1,12 @@
 # frozen_string_literal: true
 
-# load whole app
-$LOAD_PATH.unshift File.expand_path('../app', __FILE__)
+$SOURCE_PATH = File.expand_path('../app', __dir__)
+$LOAD_PATH.unshift $SOURCE_PATH
 
 require 'minitest'
 require 'minitest/autorun'
 require 'minitest/rg'
 require 'minitest/hooks/default'
+require 'minitest/reporters'
+
+Minitest::Reporters.use! Minitest::Reporters::SpecReporter.new

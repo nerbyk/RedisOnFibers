@@ -1,0 +1,15 @@
+name: Linting
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@ec02537da5712d66d4d50a0f33b7eb52773b5ed1
+        with:
+          ruby-version: '3.2'
+      - run: bundle install
+      - name: Rubocop
+        run: bundle exec rubocop
