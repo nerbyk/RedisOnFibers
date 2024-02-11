@@ -4,12 +4,20 @@ require 'delegate'
 
 class Client
   class Connection < SimpleDelegator
-    PORT = ENV.fetch('PORT', 3000).to_i
+    PORT = ENV.fetch('PORT', 8080).to_i
     HOST = ENV.fetch('HOST', '127.0.0.1').freeze
 
     def initialize
-      @logger = Logger.new($stdout)
+      @logger = Logger.new($stdout).tap { |it| it.progname = self.class.name }
       super TCPSocket.new(HOST, PORT)
+    rescue Errno::ECONNREFUSED, Errno::EADDRNOTAVAIL
+      attempt ||= 0
+      attempt += 1
+
+      @logger.error "Connection refused. Retrying... #{attempt}"
+
+      sleep 1
+      retry
     end
 
     def send_request(req)
@@ -26,17 +34,14 @@ class Client
   end
 
   def connection(&block)
-    @connection = Connection.new if @connection.nil? || @connection.closed?
+    @connection = Connection.new if @connection.nil? || @connection&.closed?
 
-    return @connection unless block
+    instance_eval(&block) if block
 
-    @connection.tap do |conn|
-      instance_eval(&block)
-    ensure
-      conn.close
-    end
+    @connection
   rescue => e
-    puts "Error: #{e.full_message.split("\n").first(5).join("\n")}"
+    @connection&.close if @connection.respond_to?(:close)
+    raise e
   end
 
   private
@@ -46,9 +51,7 @@ class Client
   end
 
   def receive(peer: connection)
-    if (res = peer.read_response)
-      res
-    end
+    peer.read_response.tap { peer.close }
   end
 end
 

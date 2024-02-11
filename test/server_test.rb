@@ -45,7 +45,7 @@ describe Server do
     it 'should process multiple clients' do
       commands = 5.times.map { "SET key#{_1} value#{_1}" }
 
-      send_parallel_commands(*commands)
+      send_parallel_commands(commands)
 
       assert_equal ['value0', 'value1', 'value2', 'value3', 'value4'], send_commmands(*(5.times.map { |i| "GET key#{i}" }))
     end

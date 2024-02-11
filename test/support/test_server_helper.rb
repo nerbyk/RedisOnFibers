@@ -4,9 +4,12 @@ module TestServerHelper
   CommandRunner = ->(command, client) do
     client.connection do 
       request(command)
-      return receive.chomp
+      return receive&.chomp
     end
   end
+  
+  Ractor.make_shareable(Client)
+  Ractor.make_shareable(CommandRunner)
 
   def start_redis_server
     @pid = spawn_server_process
@@ -26,18 +29,31 @@ module TestServerHelper
     commands.map(&method(:send_command))
   end
   
-  def send_parallel_commands(*commands)
-    Ractor.make_shareable(Client)
-    Ractor.make_shareable(CommandRunner)
+  def send_parallel_commands(commands, limit: 5)
+    ractors = limit.times.map { create_command_runner_ractor }
+    offset = (commands.size.to_f / limit).ceil
 
-    commands.map do |command|
-      Ractor.new(command, Client.new) do |cmd, client|
-        Ractor.yield CommandRunner[cmd, client]
-      end
-    end.map(&:take)
+    commands.each_slice(offset).with_index do |cmds, index|
+      ractors[index].send(cmds)
+    end
+    
+    ractors.map(&:take)
   end
   
-  private def spawn_server_process
+  private
+
+  def create_command_runner_ractor
+    Ractor.new do
+      commands = Ractor.receive
+      client = Client.new
+
+      Ractor.yield(commands.map do |cmd|
+        CommandRunner[cmd,client]
+      end)
+    end
+  end
+
+  def spawn_server_process
     raise "Server already running" if server_running?
 
     pid = fork do
@@ -46,6 +62,7 @@ module TestServerHelper
 
     wait_for_tcp_socket
 
+    Process.detach(pid)
     pid
   end
 
