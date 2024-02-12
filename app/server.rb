@@ -75,10 +75,10 @@ class Server
   PORT = ENV.fetch('PORT', 8080).to_i
   HOST = ENV.fetch('HOST', '127.0.0.1').freeze
   TCP_BACKLOG = ENV.fetch('TCP_BACKLOG', '1024').to_i
-  FIBER_POOL_SIZE = ENV.fetch('FIBER_POOL_SIZE', TCP_BACKLOG / 2).to_i
+  FIBER_POOL_SIZE = ENV.fetch('FIBER_POOL_SIZE', TCP_BACKLOG).to_i
   DISABLE_LOG = ENV.fetch('DISABLE_LOG', false)
 
-  def initialize(storage:, max_connections: 100)
+  def initialize(storage:)
     @storage = storage
     @logger = Logger.new(DISABLE_LOG ? nil : $stdout).tap { |it| it.progname = self.class.name }
     @fibers_pool = FiberPool.new(FIBER_POOL_SIZE, &method(:handle_request))
@@ -122,7 +122,7 @@ class Server
 
   def handle_request(peer)
     loop do
-      next sleep(1) unless (request = peer.gets("\n"))
+      next(Fiber.yield) unless (request = peer.gets("\n"))
 
       Handler.call(request, @storage)
         .then { |response| peer.puts(response) }

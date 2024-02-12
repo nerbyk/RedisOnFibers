@@ -10,21 +10,32 @@ The server utilizes a fiber pool to efficiently manage concurrent connections.
 bundle exec rake test:benchmarks
 ```
 
-## Benchmark Results
+## Benchmark Results (On Intel Core i5-12400F)
 
-### Parallel SET Commands under 10 Ractors
-
-| Description                                | Time (min) | Time (avg) | Time (max) | Total Time |
-|--------------------------------------------|------------|------------|------------|------------|
-| 500,000 SET Commands                       | 8.328125   | 9.140625   | 30.625000  | 15.368673  |
-| 1,000,000 SET Commands                     | 23.343750  | 19.000000  | 68.671875  | 35.260370  |
-
-### Single Thread Sequential SET Commands
+### Sequential SET Commands (100,000)
 
 | Description            | Time (min) | Time (avg) | Time (max) | Total Time |
 |------------------------|------------|------------|------------|------------|
-| 500,000 SET Commands   | 7.734375   | 7.937500   | 34.484375  | 29.627424  |
-| 1,000,000 SET Commands | 14.328125  | 15.593750  | 68.703125  | 58.686087  |
+| Single Thread          | 2.015625   | 1.468750   | 7.234375   | 6.553422   |
+| 5 Ractors              | 1.359375   | 2.203125   | 6.531250   | 3.492113   |
+| 10 Forks               | 0.531250   | 0.906250   | 30.875000  | 13.810783  |
+
+### Sequential SET Commands (500,000)
+
+| Description            | Time (min) | Time (avg) | Time (max) | Total Time |
+|------------------------|------------|------------|------------|------------|
+| Single Thread          | 7.859375   | 7.359375   | 33.968750  | 29.932314  |
+| 5 Ractors              | 9.843750   | 8.734375   | 30.828125  | 15.597305  |
+| 10 Forks               | 0.531250   | 0.906250   | 30.875000  | 13.810783  |
+
+### Sequential SET Commands (1,000,000)
+
+| Description            | Time (min) | Time (avg) | Time (max) | Total Time |
+|------------------------|------------|------------|------------|------------|
+| Single Thread          | 18.218750  | 15.578125  | 70.656250  | 62.121204  |
+| 5 Ractors              | 18.921875  | 16.828125  | 64.078125  | 34.095834  |
+| 10 Forks               | 1.328125   | 0.703125   | 61.812500  | 29.925912  |
+
 
 ## Usage
 

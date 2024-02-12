@@ -25,11 +25,11 @@ module TestServerHelper
     CommandRunner[command, client]
   end
   
-  def send_commmands(*commands)
+  def send_commmands(commands)
     commands.map(&method(:send_command))
   end
   
-  def send_parallel_commands(commands, limit: 5)
+  def send_commands_with_ractors(commands, limit: 5)
     ractors = limit.times.map { create_command_runner_ractor }
     offset = (commands.size.to_f / limit).ceil
 
@@ -38,6 +38,25 @@ module TestServerHelper
     end
     
     ractors.map(&:take)
+  end
+
+  def send_commands_with_forks(commands, limit: 2)
+    offset = (commands.size.to_f / limit).ceil
+    processes = []
+
+    commands.each_slice(offset) do |cmds|
+      pid = fork do
+        client = Client.new
+        cmds.each { |cmd| CommandRunner[cmd,client] }
+        exit
+      end
+            
+      processes << pid
+    end
+
+    processes.each(&Process.method(:wait))
+  ensure
+    processes.each { |pid| Process.kill('KILL', pid) rescue Errno::ESRCH } 
   end
   
   private
