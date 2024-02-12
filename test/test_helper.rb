@@ -9,4 +9,6 @@ require 'minitest/rg'
 require 'minitest/hooks/default'
 require 'minitest/reporters'
 
+ENV['DISABLE_LOG'] = 'true'
+
 Minitest::Reporters.use! Minitest::Reporters::SpecReporter.new

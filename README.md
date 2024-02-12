@@ -7,17 +7,24 @@ The server utilizes a fiber pool to efficiently manage concurrent connections.
 ## Benchmarking
 
 ```sh
-bundle exec rake test:benchmark
+bundle exec rake test:benchmarks
 ```
 
 ## Benchmark Results
 
-The benchmark involves 50,000 SET requests.
+### Parallel SET Commands under 10 Ractors
 
-| Description                                     | Time (min) | Time (avg) | Time (max) | Total Time |
-|-------------------------------------------------|------------|------------|------------|------------|
-| Parallel Requests from 10 Ractor Instances      | 6.578125   | 20.531250  | 27.109375  | 16.792934  |
-| Sequential Requests                             | 4.828125   | 12.968750  | 17.796875  | 26.184918  |
+| Description                                | Time (min) | Time (avg) | Time (max) | Total Time |
+|--------------------------------------------|------------|------------|------------|------------|
+| 500,000 SET Commands                       | 8.328125   | 9.140625   | 30.625000  | 15.368673  |
+| 1,000,000 SET Commands                     | 23.343750  | 19.000000  | 68.671875  | 35.260370  |
+
+### Single Thread Sequential SET Commands
+
+| Description            | Time (min) | Time (avg) | Time (max) | Total Time |
+|------------------------|------------|------------|------------|------------|
+| 500,000 SET Commands   | 7.734375   | 7.937500   | 34.484375  | 29.627424  |
+| 1,000,000 SET Commands | 14.328125  | 15.593750  | 68.703125  | 58.686087  |
 
 ## Usage
 
