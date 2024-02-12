@@ -57,7 +57,7 @@ module TestServerHelper
     raise "Server already running" if server_running?
 
     pid = fork do
-      exec "ruby", "#{$SOURCE_PATH}/server.rb"
+      exec("ruby", "#{$SOURCE_PATH}/server.rb")
     end
 
     wait_for_tcp_socket
