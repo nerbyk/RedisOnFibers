@@ -6,19 +6,25 @@ class Client
   class Connection < SimpleDelegator
     PORT = ENV.fetch('PORT', 8080).to_i
     HOST = ENV.fetch('HOST', '127.0.0.1').freeze
+    MAX_RETRIES = ENV.fetch('MAX_RETRIES', 10).to_i
+
     DISABLE_LOG = ENV.fetch('DISABLE_LOG', false)
 
     def initialize
       @logger = setup_logger
       super TCPSocket.new(HOST, PORT)
-    rescue Errno::ECONNREFUSED, Errno::EADDRNOTAVAIL
+    rescue Errno::ECONNREFUSED, Errno::EADDRNOTAVAIL => e
       attempt ||= 0
       attempt += 1
 
-      @logger.error "Connection refused. Retrying... #{attempt}"
+      if attempt < MAX_RETRIES
+        @logger.error "Connection refused. Retrying... #{attempt}"
 
-      sleep 1
-      retry
+        sleep 1
+        retry
+      else
+        raise e
+      end
     end
 
     def send_request(req)
