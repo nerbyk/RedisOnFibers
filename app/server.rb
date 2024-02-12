@@ -80,7 +80,7 @@ class Server
 
   def initialize(storage:, max_connections: 100)
     @storage = storage
-    @logger =  Logger.new(DISABLE_LOG ? nil : $stdout).tap { |it| it.progname = self.class.name }
+    @logger = Logger.new(DISABLE_LOG ? nil : $stdout).tap { |it| it.progname = self.class.name }
     @fibers_pool = FiberPool.new(FIBER_POOL_SIZE, &method(:handle_request))
   end
 
@@ -114,7 +114,7 @@ class Server
       it.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPIDLE, 50)
       it.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPINTVL, 10)
       it.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPCNT, 5)
-      
+
       it.setsockopt(Socket::SOL_SOCKET, Socket::SO_LINGER, [1, 0].pack('ii'))
       it.listen(TCP_BACKLOG)
     end
