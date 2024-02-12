@@ -6,9 +6,10 @@ class Client
   class Connection < SimpleDelegator
     PORT = ENV.fetch('PORT', 8080).to_i
     HOST = ENV.fetch('HOST', '127.0.0.1').freeze
+    DISABLE_LOG = ENV.fetch('DISABLE_LOG', false)
 
     def initialize
-      @logger = Logger.new($stdout).tap { |it| it.progname = self.class.name }
+      @logger = setup_logger
       super TCPSocket.new(HOST, PORT)
     rescue Errno::ECONNREFUSED, Errno::EADDRNOTAVAIL
       attempt ||= 0
@@ -31,6 +32,11 @@ class Client
         @logger.info "Received response: #{res.inspect}"
       end.then { |res| res&.encode('UTF-8') }
     end
+
+    def setup_logger
+      Logger.new(DISABLE_LOG ? nil : $stdout)
+        .tap { |it| it.progname = self.class.name }
+    end
   end
 
   def connection(&block)
@@ -51,7 +57,7 @@ class Client
   end
 
   def receive(peer: connection)
-    peer.read_response.tap { peer.close }
+    peer.read_response
   end
 end
 

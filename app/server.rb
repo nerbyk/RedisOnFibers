@@ -76,10 +76,11 @@ class Server
   HOST = ENV.fetch('HOST', '127.0.0.1').freeze
   TCP_BACKLOG = ENV.fetch('TCP_BACKLOG', '1024').to_i
   FIBER_POOL_SIZE = ENV.fetch('FIBER_POOL_SIZE', TCP_BACKLOG / 2).to_i
+  DISABLE_LOG = ENV.fetch('DISABLE_LOG', false)
 
   def initialize(storage:, max_connections: 100)
     @storage = storage
-    @logger = Logger.new($stdout).tap { |it| it.progname = self.class.name }
+    @logger =  Logger.new(DISABLE_LOG ? nil : $stdout).tap { |it| it.progname = self.class.name }
     @fibers_pool = FiberPool.new(FIBER_POOL_SIZE, &method(:handle_request))
   end
 
@@ -106,9 +107,14 @@ class Server
 
   def spawn_tcp_server
     TCPServer.new(HOST, PORT).tap do |it|
-      it.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
       it.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
       it.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true) if Socket.const_defined?(:SO_REUSEPORT)
+
+      it.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
+      it.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPIDLE, 50)
+      it.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPINTVL, 10)
+      it.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPCNT, 5)
+      
       it.setsockopt(Socket::SOL_SOCKET, Socket::SO_LINGER, [1, 0].pack('ii'))
       it.listen(TCP_BACKLOG)
     end
@@ -116,16 +122,15 @@ class Server
 
   def handle_request(peer)
     loop do
-      break peer&.close unless (request = peer.gets("\n"))
+      next sleep(1) unless (request = peer.gets("\n"))
 
       Handler.call(request, @storage)
         .then { |response| peer.puts(response) }
     rescue => e
       @logger.error("Error handling request: #{e.message}")
       @logger.error(e.backtrace.join("\n"))
+      peer&.close
     end
-
-    peer&.close
   end
 
   def log(msg, level: :info)
