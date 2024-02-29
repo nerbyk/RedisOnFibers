@@ -12,11 +12,11 @@ class Client
 
     def initialize
       @logger = setup_logger
+
       begin
-        retries = 0
         super TCPSocket.new(HOST, PORT)
       rescue Errno::ECONNREFUSED, Errno::EADDRNOTAVAIL => e
-        retries += 1
+        retries = (retries ||= 0) + 1
         raise e if retries > MAX_RETRIES
         sleep(3 * (0.5 + rand / 2) * 1.5**(retries - 1)) # exponential backoff
         retry
