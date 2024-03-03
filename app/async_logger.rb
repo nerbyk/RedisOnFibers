@@ -7,7 +7,7 @@ class AsyncLogger < Logger
   MAX_BUFFER_SIZE = 10_000
 
   def initialize(io_source = DEFAULT_LOG_FILE, shift_age = DEFAULT_SHIFT_AGE, ttl: DEFAULT_BUFFER_TTL, truncate: true)
-    @io_source = File.open(io_source, truncate ? 'w' : 'a')
+    @io_source = File.open(File.expand_path(io_source, "#{__dir__}/../"), truncate ? 'w' : 'a')
     @buffer = []
     @mutex = Mutex.new
     @ttl = ttl

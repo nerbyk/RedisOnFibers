@@ -3,13 +3,15 @@ require 'async_logger'
 
 describe AsyncLogger do
   subject { AsyncLogger.new(file, ttl: buffer_ttl) }
+  
   let(:buffer_ttl) { 1 }
-  let(:file) { File.open('logs/tests/async_logger_test.log') }
+  let(:file_path) { File.expand_path('logs/tests/async_logger_test.log' , __dir__ + '/../')}
+  let(:file) { File.open(file_path) }
 
   def wait_for_flush = sleep(buffer_ttl + 1)
 
   before do
-    File.open('logs/tests/async_logger_test.log', 'w').close
+    File.open(file_path, 'w').close
     subject.start_flusher
   end
 
