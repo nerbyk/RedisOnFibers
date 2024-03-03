@@ -6,8 +6,17 @@ The server utilizes a fiber pool to efficiently manage concurrent connections.
 
 ## Benchmarking
 
+All:
 ```sh
 bundle exec rake test:benchmarks
+```
+
+For single benchmark run provide `TESTOPTS="--name=/${req_number}.*${type}/"`, e.g.:
+
+```sh
+bundle exec rake test:benchmarks TESTOPTS="--name=/100_000.*seq/"
+bundle exec rake test:benchmarks TESTOPTS="--name=/500_000.*ractored/"
+bundle exec rake test:benchmarks TESTOPTS="--name=/1_000_000.*forked/"
 ```
 
 ## Benchmark Results (On Intel Core i5-12400F)
@@ -41,7 +50,7 @@ bundle exec rake test:benchmarks
 
 | Client           | Time (min) | Time (avg) | Time (max) | Total Time |
 |------------------|------------|------------|------------|------------|
-| w\o logging      | 2.015625s  | 1.468750s  | 7.234375s  | 6.553422s  |
+| w/o logging      | 2.015625s  | 1.468750s  | 7.234375s  | 6.553422s  |
 | w/ sync logging  | 3.843750   | 3.640625   | 16.578125  | 12.338142  |
 | w/ async logging | 2.515625   | 1.515625   | 10.859375  | 8.540589   |
 
