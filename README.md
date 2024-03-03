@@ -20,6 +20,7 @@ bundle exec rake test:benchmarks
 | 5 Ractors (20,000 each) | 1.359375s  | 2.203125s  | 6.531250s  | 3.492113s  |
 | 10 Forks (10,000 each)  | 0.109375s  | 0.921875s  | 15.703125s | 4.244236s  |
 
+
 ### Sequential SET Commands (500,000)
 
 | Client     | Time (min) | Time (avg) | Time (max) | Total Time |
@@ -36,7 +37,13 @@ bundle exec rake test:benchmarks
 | 5 Ractors (200,000 each) | 18.921875s | 16.828125s | 64.078125s | 34.095834s |
 | 10 Forks (100,000 each)   | 1.328125s  | 0.703125s  | 61.812500s | 29.925912s |
 
+### Benchmark for Single Threaded 100,000 SET Commands with & w/o Logging
 
+| Client           | Time (min) | Time (avg) | Time (max) | Total Time |
+|------------------|------------|------------|------------|------------|
+| w\o logging      | 2.015625s  | 1.468750s  | 7.234375s  | 6.553422s  |
+| w/ sync logging  | 3.843750   | 3.640625   | 16.578125  | 12.338142  |
+| w/ async logging | 2.515625   | 1.515625   | 10.859375  | 8.540589   |
 
 ## Usage
 

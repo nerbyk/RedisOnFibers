@@ -2,13 +2,13 @@ require 'socket'
 require 'logger'
 require 'delegate'
 
+require_relative 'async_logger'
+
 class Client
   class Connection < SimpleDelegator
     PORT = ENV.fetch('PORT', 8080).to_i
     HOST = ENV.fetch('HOST', '127.0.0.1').freeze
     MAX_RETRIES = ENV.fetch('MAX_RETRIES', 10).to_i
-
-    DISABLE_LOG = ENV.fetch('DISABLE_LOG', false)
 
     def initialize
       @logger = setup_logger
@@ -36,7 +36,7 @@ class Client
     end
 
     def setup_logger
-      Logger.new(DISABLE_LOG ? nil : $stdout)
+      (ENV['DEBUG'] ? Logger.new($stdout) : AsyncLogger.new('logs/client.log'))
         .tap { |it| it.progname = self.class.name }
     end
   end

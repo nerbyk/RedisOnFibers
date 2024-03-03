@@ -10,5 +10,6 @@ require 'minitest/hooks/default'
 require 'minitest/reporters'
 
 ENV['DISABLE_LOG'] = 'true'
+ENV['DEBUG'] = nil
 
 Minitest::Reporters.use! Minitest::Reporters::SpecReporter.new

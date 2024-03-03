@@ -15,83 +15,110 @@ describe 'Server' do
   ===========================================
   LOG
 
-  def benchmark_example(&block)
-    measure = Benchmark.measure(&block)
-
-    puts BENCHMARK_LOG % {
-      measure:, req_number:, example: name
-    }
-  end
-
-  before { start_redis_server }
-  around { |&block| benchmark_example { super(&block) } }
-  after { stop_redis_server }
-
   let(:req_number) {  100_000 }
   let(:hash_to_store) { req_number.times.map { |i| ["key#{i}", "value#{i}"] }.to_h }
   let(:commands) { hash_to_store.map { |k, v| "SET #{k} #{v}" } }
+  let(:workers) { 5 }
 
-  describe "100_000 SET commands" do
-    it "processes SET commands one by one" do
+  before do 
+    start_redis_server 
+    preload_commands
+    puts "Starting benchmark..."
+  end 
+
+  after { stop_redis_server }
+  around { |&block| benchmark_example { super(&block) } }
+
+  def benchmark_example(&block)
+    Benchmark.measure(&block).tap do |measure|
+      puts BENCHMARK_LOG % {
+        measure:, req_number:, example: name
+      }
+    end
+  end
+
+  def preload_commands(start_time = Time.now)
+    puts "Preloading SET commands..."
+    commands
+    puts "Preloaded #{req_number} SET commands in #{Time.now - start_time} seconds"
+  end
+
+  describe "100_000" do
+    it "seq" do
       send_commmands(commands)
 
       assert_equal req_number, send_command("DBSIZE").to_i
     end
 
-    it 'processes SET commands from 10 forks' do
-      send_commands_with_forks(commands, limit: 10)
+    it 'forked' do
+      send_commands_with_forks(commands, limit: workers)
 
       assert_equal req_number, send_command("DBSIZE").to_i
     end
 
-    it "processes SET commands from 5 ractors" do 
-      r = send_commands_with_ractors(commands, limit: 5)
+    it "ractored" do 
+      r = send_commands_with_ractors(commands, limit: workers)
 
       assert_equal commands.size, r.sum { |res| res.flatten.size }
     end
   end
 
-  describe "500_000 SET commands" do
+  describe "500_000" do
     let(:req_number) {  500_000 }
 
-    it "processes SET commands one by one" do
+    it "seq" do
       send_commmands(commands)
 
       assert_equal req_number, send_command("DBSIZE").to_i
     end
 
-    it 'processes SET commands from 10 forks' do
-      send_commands_with_forks(commands, limit: 10)
+    it 'forked' do
+      send_commands_with_forks(commands, limit: workers)
 
       assert_equal req_number, send_command("DBSIZE").to_i
     end
 
-    it "processes SET commands from 5 ractors" do 
-      r = send_commands_with_ractors(commands, limit: 5)
+    it "ractored" do 
+      r = send_commands_with_ractors(commands, limit: workers)
 
       assert_equal commands.size, r.sum { |res| res.flatten.size }
     end
   end
 
-  describe "1_000_000 SET commands" do
+  describe "1_000_000" do
     let(:req_number) {  1_000_000 }
 
-    it "processes SET commands one by one" do
+    it "seq" do
       send_commmands(commands)
 
       assert_equal req_number, send_command("DBSIZE").to_i
     end
 
-    it 'processes SET commands from 10 forks' do
-      send_commands_with_forks(commands, limit: 5)
+    it 'forked' do
+      send_commands_with_forks(commands, limit: workers)
 
       assert_equal req_number, send_command("DBSIZE").to_i
     end
 
-    it "processes SET commands from 5 ractors" do 
-      r = send_commands_with_ractors(commands, limit: 5)
+    it "ractored" do 
+      r = send_commands_with_ractors(commands, limit: workers)
 
       assert_equal commands.size, r.sum { |res| res.flatten.size }
+    end
+  end
+
+  describe "logging" do
+    # describe "sync" do
+    #   before { ENV['DEBUG'] = 'true' }
+    #   after { ENV.delete('DEBUG') }
+
+    #   it("seq") { send_commmands(commands) }
+    # end
+
+    describe "async" do
+      before { ENV.delete('DEBUG') }
+
+      it("seq") { send_commmands(commands) }
     end
   end
 end

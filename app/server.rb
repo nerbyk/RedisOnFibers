@@ -5,6 +5,7 @@ require 'logger'
 require 'delegate'
 require 'async/scheduler'
 
+require_relative 'async_logger'
 require_relative 'storage'
 
 Fiber.set_scheduler(Async::Scheduler.new)
@@ -76,16 +77,16 @@ class Server
   HOST = ENV.fetch('HOST', '127.0.0.1').freeze
   TCP_BACKLOG = ENV.fetch('TCP_BACKLOG', '1024').to_i
   FIBER_POOL_SIZE = ENV.fetch('FIBER_POOL_SIZE', TCP_BACKLOG).to_i
-  DISABLE_LOG = ENV.fetch('DISABLE_LOG', false)
 
-  def initialize(storage:)
+  def initialize(storage:, logger:)
     @storage = storage
-    @logger = Logger.new(DISABLE_LOG ? nil : $stdout).tap { |it| it.progname = self.class.name }
+    @logger = logger.tap { |it| it.progname = self.class.name }
     @fibers_pool = FiberPool.new(FIBER_POOL_SIZE, &method(:handle_request))
   end
 
   def start
     @fibers_pool.start
+    @logger.start_flusher if @logger.respond_to?(:start_flusher)
 
     Fiber.schedule do
       server = spawn_tcp_server
@@ -110,25 +111,32 @@ class Server
       it.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
       it.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true) if Socket.const_defined?(:SO_REUSEPORT)
 
-      it.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
-      it.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPIDLE, 50)
-      it.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPINTVL, 10)
-      it.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPCNT, 5)
+      if RUBY_PLATFORM.include?('linux')
+        it.setsockopt(Socket::SOL_SOCKET, Socket::SO_KEEPALIVE, true)
+        it.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPIDLE, 50)
+        it.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPINTVL, 10)
+        it.setsockopt(Socket::SOL_TCP, Socket::TCP_KEEPCNT, 5)
+      else
+        log 'Current socket KEEPALIVE setup linux supported only', level: :warn
+      end
 
       it.setsockopt(Socket::SOL_SOCKET, Socket::SO_LINGER, [1, 0].pack('ii'))
       it.listen(TCP_BACKLOG)
-    end
+    end.tap { |it| log "Server started at: #{it.addr.inspect}" }
   end
 
   def handle_request(peer)
     loop do
       next(Fiber.yield) unless (request = peer.gets("\n"))
 
+      log "Received request: #{request.inspect} from: #{peer.peeraddr.inspect}"
+
       Handler.call(request, @storage)
         .then { |response| peer.puts(response) }
+        .tap { |res| log "Sent response: #{res.inspect} to: #{peer.peeraddr.inspect}" }
     rescue => e
-      @logger.error("Error handling request: #{e.message}")
-      @logger.error(e.backtrace.join("\n"))
+      log("Error handling request: #{e.message}", level: :error)
+      log(e.backtrace.join("\n"), level: :error)
       peer&.close
     end
   end
@@ -143,8 +151,10 @@ if $PROGRAM_NAME == __FILE__
     TCPSocket.open(Server::HOST, Server::PORT).close
     raise 'Server already running'
   rescue Errno::ECONNREFUSED, Errno::EADDRNOTAVAIL
-    st = Storage.new
-    Server.new(storage: st).start
+    storage = Storage.new
+    logger = ENV['DEBUG'] ? Logger.new($stdout) : AsyncLogger.new('logs/server.log')
+
+    Server.new(storage:, logger:).start
   end
 end
 
@@ -152,6 +162,8 @@ at_exit do
   puts 'Server is shutting down...'
 
   if $!
+    logger.flush if defined?(logger) && logger.respond_to?(:flush)
+
     puts "Program exited due to an unhandled exception: #{$!.message}"
     puts $!.full_message
   end

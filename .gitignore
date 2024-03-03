@@ -1,1 +1,2 @@
 .bundle
+logs/**/*.log

@@ -9,14 +9,16 @@ class Storage < DelegateClass(Hash)
       pong: 'PONG',
       err: 'ERR',
       ex: 'EX'
-    }
+    }.freeze
 
     def self.[](storage = Storage.new) = super
 
     def execute(query)
-      raise ArgumentError, "Unknown command: #{query.command}" unless defined?("execute_#{query.command}")
+      execute_method_name = "execute_#{query.command}".to_sym
 
-      method("execute_#{query.command}").call(query)
+      raise ArgumentError, "Unknown command: #{query.command}" unless defined?(execute_method_name)
+
+      send(execute_method_name, query)
     end
 
     private
@@ -57,11 +59,11 @@ class Storage < DelegateClass(Hash)
     super(data)
   end
 
-  def [](key)
+  def [](...)
     @mutex.synchronize { super }
   end
 
-  def []=(key, value)
+  def []=(...)
     @mutex.synchronize { super }
   end
 
@@ -69,7 +71,7 @@ class Storage < DelegateClass(Hash)
     @mutex.synchronize { @time_events << TimeEvent.new(key, process_at) }
   end
 
-  def execute(query)
-    QueryExecutor[@storage].execute(query)
+  def execute(query, query_runner: QueryExecutor[self])
+    query_runner.execute(query)
   end
 end
