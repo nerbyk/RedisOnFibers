@@ -11,6 +11,9 @@ class AsyncLogger < Logger
     @buffer = []
     @mutex = Mutex.new
     @ttl = ttl
+
+    at_exit { flush }
+
     super(@io_source, shift_age)
   end
 
@@ -25,7 +28,7 @@ class AsyncLogger < Logger
 
   def log(severity, message = nil, progname = nil)
     @mutex.synchronize { @buffer << format_message(severity, Time.now, progname, message) }
-    flush if @buffer.size >= MAX_BUFFER_SIZE
+    flush if @buffer.size > MAX_BUFFER_SIZE
   end
 
   def flush
