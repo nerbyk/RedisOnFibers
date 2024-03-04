@@ -2,7 +2,7 @@ require 'test_helper'
 require 'async_logger'
 
 describe AsyncLogger do
-  subject { AsyncLogger.new(file, ttl: buffer_ttl) }
+  subject { AsyncLogger.new(file_path, ttl: buffer_ttl) }
 
   let(:buffer_ttl) { 1 }
   let(:file_path) { File.expand_path('logs/tests/async_logger_test.log', __dir__ + '/../') }
