@@ -17,7 +17,7 @@ module TestServerHelper
   end
   
   def stop_redis_server
-    Process.kill('TERM', @pid)
+    Process.kill('INT', @pid)
     Process.wait(@pid)
   end
   

@@ -8,7 +8,8 @@ require 'async/scheduler'
 require_relative 'async_logger'
 require_relative 'storage'
 
-Fiber.set_scheduler(Async::Scheduler.new)
+scheduler = Async::Scheduler.new
+Fiber.set_scheduler(scheduler)
 
 class Server
   Request = Data.define(:command, :args) do
@@ -50,6 +51,8 @@ class Server
       @queue = Queue.new
       @fibers = Array.new(max_fibers) { create_fiber }
       @mutex = Mutex.new
+
+      at_exit { stop }
     end
 
     def acquire(&block)
@@ -58,6 +61,10 @@ class Server
 
     def start
       @fibers.each(&:resume)
+    end
+
+    def stop
+      @fibers.each { |f| f.kill rescue nil } # rubocop:disable Style/RescueModifier
     end
 
     private
@@ -86,7 +93,6 @@ class Server
 
   def start
     @fibers_pool.start
-    @logger.start_flusher if @logger.respond_to?(:start_flusher)
 
     Fiber.schedule do
       server = spawn_tcp_server
@@ -152,7 +158,7 @@ if $PROGRAM_NAME == __FILE__
     raise 'Server already running'
   rescue Errno::ECONNREFUSED, Errno::EADDRNOTAVAIL
     storage = Storage.new
-    logger = ENV['DEBUG'] ? Logger.new($stdout) : AsyncLogger.new('logs/server.log')
+    logger = ENV['DEBUG'] ? Logger.new($stdout) : AsyncLogger.new('logs/server.log').tap(&:start_flusher)
 
     Server.new(storage:, logger:).start
   end
@@ -162,9 +168,6 @@ at_exit do
   puts 'Server is shutting down...'
 
   if $!
-    logger.flush if defined?(logger) && logger.respond_to?(:flush)
-
     puts "Program exited due to an unhandled exception: #{$!.message}"
-    puts $!.full_message
   end
 end

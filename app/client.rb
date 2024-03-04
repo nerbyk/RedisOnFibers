@@ -11,33 +11,32 @@ class Client
     MAX_RETRIES = ENV.fetch('MAX_RETRIES', 10).to_i
 
     def initialize
-      @logger = setup_logger
-
-      begin
-        super TCPSocket.new(HOST, PORT)
-      rescue Errno::ECONNREFUSED, Errno::EADDRNOTAVAIL => e
-        retries = (retries ||= 0) + 1
-        raise e if retries > MAX_RETRIES
-        sleep(3 * (0.5 + rand / 2) * 1.5**(retries - 1)) # exponential backoff
-        retry
-      end
+      super TCPSocket.new(HOST, PORT)
+    rescue Errno::ECONNREFUSED, Errno::EADDRNOTAVAIL => e
+      retries = (retries ||= 0) + 1
+      raise e if retries > MAX_RETRIES
+      sleep(3 * (0.5 + rand / 2) * 1.5**(retries - 1)) # exponential backoff
+      retry
     end
 
     def send_request(req)
       self.puts(req).tap do
-        @logger.info "Sent request: #{req.inspect}"
+        logger.info "Sent request: #{req.inspect}"
       end
     end
 
     def read_response(timeout: 5)
       self.gets("\n").tap do |res|
-        @logger.info "Received response: #{res.inspect}"
+        logger.info "Received response: #{res.inspect}"
       end.then { |res| res&.encode('UTF-8') }
     end
 
-    def setup_logger
-      (ENV['DEBUG'] ? Logger.new($stdout) : AsyncLogger.new('logs/client.log'))
-        .tap { |it| it.progname = self.class.name }
+    def logger
+      @logger ||= if ENV['DEBUG']
+        Logger.new($stdout)
+      else
+        AsyncLogger.new('logs/client.log').tap(&:start_flusher)
+      end.tap { |it| it.progname = self.class.name }
     end
   end
 

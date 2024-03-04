@@ -108,12 +108,12 @@ describe 'Server' do
   end
 
   describe "logging" do
-    # describe "sync" do
-    #   before { ENV['DEBUG'] = 'true' }
-    #   after { ENV.delete('DEBUG') }
+    describe "sync" do
+      before { ENV['DEBUG'] = 'true' }
+      after { ENV.delete('DEBUG') }
 
-    #   it("seq") { send_commmands(commands) }
-    # end
+      it("seq") { send_commmands(commands) }
+    end
 
     describe "async" do
       before { ENV.delete('DEBUG') }
