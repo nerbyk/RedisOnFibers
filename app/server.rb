@@ -5,45 +5,17 @@ require 'logger'
 require 'delegate'
 require 'async/scheduler'
 
-require_relative 'async_logger'
-require_relative 'storage'
+require_relative 'request'
 
 scheduler = Async::Scheduler.new
 Fiber.set_scheduler(scheduler)
 
 class Server
-  Request = Data.define(:command, :args) do
-    def self.[](request_string)
-      command, *args = request_string.split
-      command = command.downcase.to_sym if command
-
-      new(command:, args:)
-    end
-  end
-
-  Query = Struct.new(:command, :args, :options) do
-    QUERIES = { # rubocop:disable Lint/ConstantDefinitionInBlock
-      set: -> (args) { { args: args[0..1], options: args[2..] } },
-      get: -> (args) { { args: [args[0]] } },
-      echo: -> (args) { { args: } },
-      ping: -> (_) { {} },
-      dbsize: -> (_) { {} }
-    }
-
-    def self.[](request)
-      if QUERIES.key?(request.command)
-        new(command: request.command, **QUERIES[request.command][request.args])
-      else
-        new(command: :error, args: ['ERR', 'Unknown command'])
-      end
-    end
-  end
-
   Handler = lambda do |request_string, storage|
     request_string
-      .then { |raw_request| Request[raw_request] }
-      .then { |request| Query[request] }
-      .then { |query| Storage::QueryExecutor[storage].execute(query) }
+      .then { |raw_request| Request::Request[raw_request] }
+      .then { |request| Request::Query[request] }
+      .then { |query| Request::QueryExecutor.execute(query, storage:) }
   end
 
   class FiberPool
@@ -153,6 +125,9 @@ class Server
 end
 
 if $PROGRAM_NAME == __FILE__
+  require_relative 'storage'
+  require_relative 'async_logger'
+
   begin
     TCPSocket.open(Server::HOST, Server::PORT).close
     raise 'Server already running'
